@@ -7,9 +7,7 @@ class AiConfigService {
   static const _groqKeyPref = 'lorvani_ai_groq_key';
 
   /// Pre-configured high-speed Groq API key available out of the box
-  static const defaultGroqApiKey =
-      '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';
-
+ 
   final SharedPreferences? _prefs;
 
   AiConfigService([this._prefs]);

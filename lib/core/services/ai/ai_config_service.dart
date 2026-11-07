@@ -1,0 +1,76 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Service managing user-provided AI API keys and model configurations.
+class AiConfigService {
+  static const _geminiKeyPref = 'lorvani_ai_gemini_key';
+  static const _groqKeyPref = 'lorvani_ai_groq_key';
+
+  final SharedPreferences? _prefs;
+
+  AiConfigService([this._prefs]);
+
+  static Future<AiConfigService> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    return AiConfigService(prefs);
+  }
+
+  /// Get stored Gemini API Key, falling back to compile-time environment variable.
+  String? getGeminiApiKey() {
+    final stored = _prefs?.getString(_geminiKeyPref);
+    if (stored != null && stored.trim().isNotEmpty) {
+      return stored.trim();
+    }
+    const envKey = String.fromEnvironment('GEMINI_API_KEY');
+    if (envKey.isNotEmpty) {
+      return envKey;
+    }
+    return null;
+  }
+
+  /// Save Gemini API Key.
+  Future<bool> setGeminiApiKey(String? key) async {
+    if (_prefs == null) return false;
+    if (key == null || key.trim().isEmpty) {
+      return _prefs.remove(_geminiKeyPref);
+    }
+    return _prefs.setString(_geminiKeyPref, key.trim());
+  }
+
+  /// Get stored Groq API Key, falling back to compile-time environment variable.
+  String? getGroqApiKey() {
+    final stored = _prefs?.getString(_groqKeyPref);
+    if (stored != null && stored.trim().isNotEmpty) {
+      return stored.trim();
+    }
+    const envKey = String.fromEnvironment('GROQ_API_KEY');
+    if (envKey.isNotEmpty) {
+      return envKey;
+    }
+    return null;
+  }
+
+  /// Save Groq API Key.
+  Future<bool> setGroqApiKey(String? key) async {
+    if (_prefs == null) return false;
+    if (key == null || key.trim().isEmpty) {
+      return _prefs.remove(_groqKeyPref);
+    }
+    return _prefs.setString(_groqKeyPref, key.trim());
+  }
+
+  /// Check whether at least one live LLM provider has an active API key configured.
+  bool get hasLiveKeyConfigured =>
+      getGeminiApiKey() != null || getGroqApiKey() != null;
+
+  /// Provider name currently in use for display.
+  String get activeProviderName {
+    if (getGeminiApiKey() != null) return 'Google Gemini 1.5 Flash';
+    if (getGroqApiKey() != null) return 'Groq LPU (Llama 3.3)';
+    return 'Offline Comic Story Engine';
+  }
+}
+
+final aiConfigServiceProvider = Provider<AiConfigService>((ref) {
+  return AiConfigService();
+});

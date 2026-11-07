@@ -110,6 +110,36 @@ void main() {
       expect(service.isLoggedIn, isTrue);
       expect(service.canGenerateStory, isTrue);
     });
+
+    test('validates email typos and invalid domains correctly', () {
+      expect(AuthService.validateEmail(null), equals('Please enter your email.'));
+      expect(AuthService.validateEmail(''), equals('Please enter your email.'));
+      expect(AuthService.validateEmail('invalid'), equals('Please enter a valid email address.'));
+      expect(
+        AuthService.validateEmail('user@gmail.con'),
+        equals('Invalid email domain. Did you mean .com?'),
+      );
+      expect(
+        AuthService.validateEmail('user@gmai.com'),
+        equals('Did you mean @gmail.com?'),
+      );
+      expect(
+        AuthService.validateEmail('user@yaho.com'),
+        equals('Did you mean @yahoo.com?'),
+      );
+      expect(AuthService.validateEmail('valid.user@gmail.com'), isNull);
+    });
+
+    test('recovers session and initializes prefs lazily when not pre-provided', () async {
+      final uninitializedService = AuthService();
+      final reg = await uninitializedService.signUp(
+        email: 'lazy@lorvani.com',
+        password: 'password123',
+      );
+      expect(reg.isSuccess, isTrue);
+      expect(uninitializedService.isLoggedIn, isTrue);
+      expect(uninitializedService.getCurrentUser()?.email, equals('lazy@lorvani.com'));
+    });
   });
 }
 

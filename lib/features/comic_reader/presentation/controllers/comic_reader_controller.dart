@@ -1,16 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../core/services/audio/comic_tts_service.dart';
+import '../../../../core/services/auth/auth_service.dart';
 import '../../../../data/models/comic_story_model.dart';
 import '../../data/comic_reader_state.dart';
 
 final comicTtsServiceProvider = Provider<ComicTtsService>((ref) {
-  return ComicTtsService();
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return ComicTtsService(prefs: prefs);
 });
 
 final comicReaderControllerProvider =
     NotifierProvider<ComicReaderController, ComicReaderState>(
-  ComicReaderController.new,
-);
+      ComicReaderController.new,
+    );
 
 class ComicReaderController extends Notifier<ComicReaderState> {
   late ComicTtsService _ttsService;
@@ -19,6 +22,9 @@ class ComicReaderController extends Notifier<ComicReaderState> {
   ComicReaderState build() {
     _ttsService = ref.watch(comicTtsServiceProvider);
     _ttsService.onSpeechCompleted = _handleSpeechCompleted;
+    ref.onDispose(() {
+      _ttsService.stop();
+    });
     return const ComicReaderState();
   }
 
@@ -106,7 +112,9 @@ class ComicReaderController extends Notifier<ComicReaderState> {
   /// Explicitly halts any ongoing speech or auto-play sequence immediately
   Future<void> stopNarration() async {
     await _ttsService.stop();
-    state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+    if (ref.mounted) {
+      state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+    }
   }
 
   /// Toggles voice narration for the current panel
@@ -120,7 +128,10 @@ class ComicReaderController extends Notifier<ComicReaderState> {
     if (panel == null) return;
 
     final lang = state.story?.language;
-    final script = ComicTtsService.buildPanelSpeechScript(panel, language: lang);
+    final script = ComicTtsService.buildPanelSpeechScript(
+      panel,
+      language: lang,
+    );
     if (script.isEmpty) return;
 
     state = state.copyWith(isSpeaking: true);
@@ -149,7 +160,10 @@ class ComicReaderController extends Notifier<ComicReaderState> {
     }
 
     final lang = state.story?.language;
-    final script = ComicTtsService.buildPanelSpeechScript(panel, language: lang);
+    final script = ComicTtsService.buildPanelSpeechScript(
+      panel,
+      language: lang,
+    );
     if (script.isEmpty) {
       _handleSpeechCompleted();
       return;
@@ -166,12 +180,16 @@ class ComicReaderController extends Notifier<ComicReaderState> {
   Future<void> speakSingleDialogue(ComicDialogue dialogue) async {
     await _ttsService.stop();
     state = state.copyWith(isSpeaking: true, isAutoPlaying: false);
-    final isHindi = (state.story?.language.toLowerCase() == 'hindi') ||
+    final isHindi =
+        (state.story?.language.toLowerCase() == 'hindi') ||
         RegExp(r'[\u0900-\u097F]').hasMatch(dialogue.text);
     final speechText = isHindi
         ? '${dialogue.speaker} कहते हैं: ${dialogue.text}'
         : '${dialogue.speaker} says: ${dialogue.text}';
-    final success = await _ttsService.speak(speechText, language: state.story?.language);
+    final success = await _ttsService.speak(
+      speechText,
+      language: state.story?.language,
+    );
     if (!success) {
       state = state.copyWith(isSpeaking: false);
     }

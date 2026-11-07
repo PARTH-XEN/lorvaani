@@ -89,7 +89,12 @@ void main() {
       );
 
       expect(script, contains('पौधे सूर्य से ऊर्जा लेते हैं.'));
-      expect(script, contains('अध्यापक कहते हैं: यह पर्णहरित है.'));
+      expect(script, contains('अध्यापक: यह पर्णहरित है.'));
+    });
+
+    test('sanitizes markdown artifacts and excessive symbols from text for TTS', () {
+      final sanitized = ComicTtsService.sanitizeForTts('**Bold** and *italic* #header [link]');
+      expect(sanitized, equals('Bold and italic header link'));
     });
   });
 }

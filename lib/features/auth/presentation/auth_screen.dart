@@ -304,17 +304,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
                           style: ComicTypography.body(color: Colors.white),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter your email.';
-                            }
-                            final regex =
-                                RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,6}$');
-                            if (!regex.hasMatch(value.trim())) {
-                              return 'Please enter a valid email address.';
-                            }
-                            return null;
-                          },
+                          validator: (value) => AuthService.validateEmail(value),
                           decoration: _inputDecoration(
                             hint: 'scholar@lorvani.com',
                             icon: Icons.email_outlined,

@@ -152,15 +152,29 @@ class ComicTtsService {
     await _applyVoiceParams();
   }
 
-  Future<void> _applyVoiceParams() async {
+  Future<void> _applyVoiceParams({bool isHindi = false}) async {
     if (isMockMode || flutterTts == null) return;
     try {
       await flutterTts!.setVolume(_volume);
-      await flutterTts!.setPitch(_persona.pitch);
-      await flutterTts!.setSpeechRate(_persona.rate);
+
+      // Hindi speech engine needs a brisk, natural rate and standard pitch
+      // to avoid sluggish, robotic syllable dragging.
+      final pitch = isHindi ? 1.0 : _persona.pitch;
+      final rate = isHindi ? 0.60 : _persona.rate;
+
+      await flutterTts!.setPitch(pitch);
+      await flutterTts!.setSpeechRate(rate);
     } catch (e) {
       debugPrint('Error applying TTS voice params: $e');
     }
+  }
+
+  /// Strips markdown characters and symbols that cause TTS hesitation or artifacts
+  static String sanitizeForTts(String text) {
+    return text
+        .replaceAll(RegExp(r'[*_~#`>\[\]]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   /// Resolves the optimal IETF BCP 47 language code for speech synthesis
@@ -199,17 +213,25 @@ class ComicTtsService {
     final isHindi = (language?.toLowerCase() == 'hindi') ||
         RegExp(r'[\u0900-\u097F]').hasMatch(panel.narration);
 
-    if (panel.narration.trim().isNotEmpty) {
-      buffer.write(panel.narration.trim());
+    final cleanNarration = sanitizeForTts(panel.narration);
+    if (cleanNarration.isNotEmpty) {
+      buffer.write(cleanNarration);
       buffer.write('. ');
     }
 
     for (final d in panel.dialogue) {
-      if (d.text.trim().isNotEmpty) {
+      final cleanText = sanitizeForTts(d.text);
+      if (cleanText.isNotEmpty) {
+        final cleanSpeaker = sanitizeForTts(d.speaker);
         if (isHindi) {
-          buffer.write('${d.speaker} कहते हैं: ${d.text.trim()}. ');
+          // Clean, fluent Hindi dialogue flow without repetitive robotic phrasing
+          if (cleanSpeaker.isNotEmpty && RegExp(r'[\u0900-\u097F]').hasMatch(cleanSpeaker)) {
+            buffer.write('$cleanSpeaker: $cleanText. ');
+          } else {
+            buffer.write('$cleanText. ');
+          }
         } else {
-          buffer.write('${d.speaker} says: ${d.text.trim()}. ');
+          buffer.write('$cleanSpeaker says: $cleanText. ');
         }
       }
     }
@@ -219,12 +241,14 @@ class ComicTtsService {
 
   /// Speaks the provided text in the target language
   Future<bool> speak(String text, {String? language}) async {
-    if (text.trim().isEmpty) return false;
+    final cleanText = sanitizeForTts(text);
+    if (cleanText.isEmpty) return false;
 
-    _currentlySpeakingText = text;
+    _currentlySpeakingText = cleanText;
     _status = TtsPlaybackStatus.speaking;
 
-    final targetLang = resolveLanguageCode(language, text);
+    final targetLang = resolveLanguageCode(language, cleanText);
+    final isHindi = targetLang == 'hi-IN';
     if (targetLang != _currentLanguageCode) {
       await setLanguage(targetLang);
     }
@@ -234,8 +258,8 @@ class ComicTtsService {
     }
 
     try {
-      await _applyVoiceParams();
-      final result = await flutterTts?.speak(text);
+      await _applyVoiceParams(isHindi: isHindi);
+      final result = await flutterTts?.speak(cleanText);
       return result == 1;
     } catch (e) {
       debugPrint('TTS speak error: $e');

@@ -55,9 +55,59 @@ class AuthService {
   static const _currentSessionKey = 'lorvani_auth_session';
   static const _guestStoriesCountKey = 'lorvani_guest_stories_count';
 
-  final SharedPreferences? _prefs;
+  SharedPreferences? _prefs;
+  AuthUser? _cachedUser;
 
-  AuthService([this._prefs]);
+  AuthService([this._prefs]) {
+    _loadInitialSession();
+  }
+
+  void _loadInitialSession() {
+    final raw = _prefs?.getString(_currentSessionKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final json = jsonDecode(raw) as Map<String, dynamic>;
+        _cachedUser = AuthUser.fromJson(json);
+      } catch (_) {}
+    }
+  }
+
+  Future<SharedPreferences?> _ensurePrefs() async {
+    if (_prefs != null) return _prefs;
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      return _prefs;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Strict email syntax and popular domain typo validator
+  static String? validateEmail(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return 'Please enter your email.';
+    }
+    final email = raw.trim().toLowerCase();
+    final regex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,63}$');
+    if (!regex.hasMatch(email)) {
+      return 'Please enter a valid email address.';
+    }
+
+    final parts = email.split('@');
+    if (parts.length != 2) return 'Please enter a valid email address.';
+    final domain = parts[1];
+
+    if (domain.endsWith('.con') || domain.endsWith('.cmo') || domain.endsWith('.ocm')) {
+      return 'Invalid email domain. Did you mean .com?';
+    }
+    if (domain == 'gmai.com' || domain == 'gamil.com' || domain == 'gmial.com') {
+      return 'Did you mean @gmail.com?';
+    }
+    if (domain == 'yaho.com' || domain == 'yahooo.com') {
+      return 'Did you mean @yahoo.com?';
+    }
+    return null;
+  }
 
   static Future<AuthService> initialize() async {
     final prefs = await SharedPreferences.getInstance();
@@ -66,11 +116,13 @@ class AuthService {
 
   /// Current authenticated user (null if guest)
   AuthUser? getCurrentUser() {
+    if (_cachedUser != null) return _cachedUser;
     final raw = _prefs?.getString(_currentSessionKey);
     if (raw == null || raw.isEmpty) return null;
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
-      return AuthUser.fromJson(json);
+      _cachedUser = AuthUser.fromJson(json);
+      return _cachedUser;
     } catch (_) {
       return null;
     }
@@ -86,9 +138,10 @@ class AuthService {
 
   /// Records story generation, incrementing guest counter if unauthenticated
   Future<void> recordStoryGenerated() async {
-    if (!isLoggedIn && _prefs != null) {
+    if (!isLoggedIn) {
+      final prefs = await _ensurePrefs();
       final current = guestStoriesCount;
-      await _prefs.setInt(_guestStoriesCountKey, current + 1);
+      await prefs?.setInt(_guestStoriesCountKey, current + 1);
     }
   }
 
@@ -106,8 +159,8 @@ class AuthService {
   }
 
   Future<void> _saveUsersDb(Map<String, Map<String, dynamic>> db) async {
-    if (_prefs == null) return;
-    await _prefs.setString(_usersDbKey, jsonEncode(db));
+    final prefs = await _ensurePrefs();
+    await prefs?.setString(_usersDbKey, jsonEncode(db));
   }
 
   /// Register a new account
@@ -116,23 +169,23 @@ class AuthService {
     required String password,
     String? name,
   }) async {
+    final validationError = validateEmail(email);
+    if (validationError != null) {
+      return AuthResult.error(validationError);
+    }
+
     final trimmedEmail = email.trim().toLowerCase();
     final trimmedPassword = password.trim();
 
-    // 1. Email format regex validation
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,6}$');
-    if (!emailRegex.hasMatch(trimmedEmail)) {
-      return AuthResult.error('Please enter a valid email address.');
-    }
-
-    // 2. Password length check
+    // Password length check
     if (trimmedPassword.length < 6) {
       return AuthResult.error('Password must be at least 6 characters long.');
     }
 
+    final prefs = await _ensurePrefs();
     final db = _getUsersDb();
 
-    // 3. Duplicate user check
+    // Duplicate user check
     if (db.containsKey(trimmedEmail)) {
       return AuthResult.error(
         'An account with this email already exists. Please sign in instead.',
@@ -157,7 +210,8 @@ class AuthService {
     };
 
     await _saveUsersDb(db);
-    await _prefs?.setString(_currentSessionKey, jsonEncode(user.toJson()));
+    await prefs?.setString(_currentSessionKey, jsonEncode(user.toJson()));
+    _cachedUser = user;
 
     return AuthResult.success(user);
   }
@@ -167,9 +221,15 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    final validationError = validateEmail(email);
+    if (validationError != null) {
+      return AuthResult.error(validationError);
+    }
+
     final trimmedEmail = email.trim().toLowerCase();
     final trimmedPassword = password.trim();
 
+    final prefs = await _ensurePrefs();
     final db = _getUsersDb();
 
     // 1. Account existence check
@@ -187,24 +247,33 @@ class AuthService {
     }
 
     final user = AuthUser.fromJson(userData);
-    await _prefs?.setString(_currentSessionKey, jsonEncode(user.toJson()));
+    await prefs?.setString(_currentSessionKey, jsonEncode(user.toJson()));
+    _cachedUser = user;
 
     return AuthResult.success(user);
   }
 
   /// End current authenticated session
   Future<void> signOut() async {
-    await _prefs?.remove(_currentSessionKey);
+    _cachedUser = null;
+    final prefs = await _ensurePrefs();
+    await prefs?.remove(_currentSessionKey);
   }
 
   /// For testing or resetting demo state
   Future<void> resetGuestTrial() async {
-    await _prefs?.remove(_guestStoriesCountKey);
+    final prefs = await _ensurePrefs();
+    await prefs?.remove(_guestStoriesCountKey);
   }
 }
 
+final sharedPreferencesProvider = Provider<SharedPreferences?>((ref) {
+  return null;
+});
+
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return AuthService(prefs);
 });
 
 class CurrentUserNotifier extends Notifier<AuthUser?> {

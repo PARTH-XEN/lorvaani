@@ -29,6 +29,11 @@ class ComicTrialGateDialog extends StatelessWidget {
       builder: (ctx) => const ComicTrialGateDialog(),
     );
 
+    // Re-check authentication state in case user signed in/registered
+    if (ref.read(authServiceProvider).canGenerateStory) {
+      return true;
+    }
+
     return result ?? false;
   }
 
@@ -105,10 +110,9 @@ class ComicTrialGateDialog extends StatelessWidget {
               icon: Icons.login_rounded,
               variant: ComicButtonVariant.gradient,
               onPressed: () async {
-                Navigator.of(context).pop();
                 final authed = await context.push<bool>('/auth');
-                if (authed == true) {
-                  // User authenticated
+                if (context.mounted) {
+                  Navigator.of(context).pop(authed == true);
                 }
               },
             ),

@@ -27,16 +27,24 @@ class ComicReaderScreen extends ConsumerStatefulWidget {
 
 class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
   late PageController _pageController;
+  late ComicReaderController _readerController;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _readerController = ref.read(comicReaderControllerProvider.notifier);
 
     // Initialize reader state on next microtask
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(comicReaderControllerProvider.notifier).initialize(widget.story);
+      _readerController.initialize(widget.story);
     });
+  }
+
+  @override
+  void deactivate() {
+    _readerController.stopNarration();
+    super.deactivate();
   }
 
   @override
@@ -88,60 +96,107 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
       }
     });
 
-    return Scaffold(
-      backgroundColor: ComicColors.deepCharcoal,
-      appBar: AppBar(
-        backgroundColor: ComicColors.cardBackground,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: ComicColors.softWhite),
-          onPressed: () => context.pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.story.storyTitle,
-              style: ComicTypography.title(
-                fontSize: 16,
-                color: ComicColors.softWhite,
-                fontWeight: FontWeight.bold,
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) {
+        _readerController.stopNarration();
+      },
+      child: Scaffold(
+        backgroundColor: ComicColors.deepCharcoal,
+        floatingActionButton: (readerState.isSpeaking || readerState.isAutoPlaying)
+            ? FloatingActionButton.extended(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                icon: const Icon(Icons.stop_rounded, size: 24),
+                label: Text(
+                  'STOP VOICE',
+                  style: ComicTypography.title(
+                    fontSize: 12,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                onPressed: () => controller.stopNarration(),
+              )
+            : null,
+        appBar: AppBar(
+          backgroundColor: ComicColors.cardBackground,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: ComicColors.softWhite),
+            onPressed: () {
+              controller.stopNarration();
+              context.pop();
+            },
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.story.storyTitle,
+                style: ComicTypography.title(
+                  fontSize: 16,
+                  color: ComicColors.softWhite,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              widget.story.originalTopic,
-              style: ComicTypography.caption(color: ComicColors.skyCyan),
-            ),
-          ],
-        ),
-        actions: [
-          // Hands-free Auto-Play Full Story Audio
-          IconButton(
-            icon: Icon(
-              readerState.isAutoPlaying
-                  ? Icons.pause_circle_filled_rounded
-                  : Icons.play_circle_filled_rounded,
-              color: readerState.isAutoPlaying
-                  ? ComicColors.vibrantOrange
-                  : ComicColors.skyCyan,
-            ),
-            tooltip: readerState.isAutoPlaying
-                ? 'Pause Hands-Free Story Audio'
-                : 'Auto-Play Full Story Audio (Hands-Free)',
-            onPressed: () => controller.toggleAutoPlayNarration(),
+              Text(
+                widget.story.originalTopic,
+                style: ComicTypography.caption(color: ComicColors.skyCyan),
+              ),
+            ],
           ),
+          actions: [
+            // Hands-free Auto-Play / Active Stop Audio Button
+            if (readerState.isAutoPlaying || readerState.isSpeaking)
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white, width: 1.2),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.stop_rounded, size: 14, color: Colors.white),
+                      SizedBox(width: 2),
+                      Text(
+                        'STOP',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                tooltip: 'Stop Voice Narration',
+                onPressed: () => controller.stopNarration(),
+              )
+            else
+              IconButton(
+                icon: const Icon(
+                  Icons.play_circle_filled_rounded,
+                  color: ComicColors.skyCyan,
+                ),
+                tooltip: 'Auto-Play Full Story Audio (Hands-Free)',
+                onPressed: () => controller.toggleAutoPlayNarration(),
+              ),
 
-          // Voice Persona & Volume Adjuster
-          IconButton(
-            icon: const Icon(Icons.tune_rounded, color: ComicColors.skyCyan),
-            tooltip: 'Voice Persona & Volume Adjuster',
-            onPressed: () => AudioSettingsSheet.show(
-              context,
-              storyLanguage: widget.story.language,
+            // Voice Persona & Volume Adjuster
+            IconButton(
+              icon: const Icon(Icons.tune_rounded, color: ComicColors.skyCyan),
+              tooltip: 'Voice Persona & Volume Adjuster',
+              onPressed: () => AudioSettingsSheet.show(
+                context,
+                storyLanguage: widget.story.language,
+              ),
             ),
-          ),
 
           // Reading mode switch (Horizontal Page vs Vertical Scroll)
           IconButton(
@@ -289,8 +344,9 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
           _buildBottomBar(context, readerState, controller),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildHorizontalView(ComicReaderState state, ComicReaderController controller) {
     final panels = widget.story.panels;
@@ -445,6 +501,31 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
                               curve: Curves.easeInOut,
                             );
                           },
+                  ),
+                ],
+
+                // Dedicated High-Contrast Stop Button in Bottom Bar during speech
+                if (state.isAutoPlaying || state.isSpeaking) ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => controller.stopNarration(),
+                    icon: const Icon(Icons.stop_rounded, color: Colors.white, size: 18),
+                    label: const Text(
+                      'STOP',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: const BorderSide(color: Colors.black, width: 1.5),
+                      ),
+                    ),
                   ),
                 ],
               ],

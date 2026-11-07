@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../auth/auth_service.dart';
+
 /// Data model representing user streak state
 class StreakData {
   final int streakDays;
@@ -54,10 +56,18 @@ class StreakService {
     final parts = storedLastDate.split('-');
     if (parts.length != 3) {
       activeDays[todayWeekdayIndex] = true;
-      return StreakData(streakDays: 1, activeDaysOfWeek: activeDays, isFirstDay: true);
+      return StreakData(
+        streakDays: 1,
+        activeDaysOfWeek: activeDays,
+        isFirstDay: true,
+      );
     }
 
-    final lastDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+    final lastDate = DateTime(
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+      int.parse(parts[2]),
+    );
     final todayDate = DateTime(now.year, now.month, now.day);
     final diffDays = todayDate.difference(lastDate).inDays;
 
@@ -95,7 +105,8 @@ class StreakService {
     if (_prefs == null) return;
     final data = getStreakData();
     final now = DateTime.now();
-    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final todayStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
     await _prefs.setInt(_streakDaysPref, data.streakDays);
     await _prefs.setString(_lastActiveDatePref, todayStr);
@@ -107,7 +118,8 @@ class StreakService {
 }
 
 final streakServiceProvider = Provider<StreakService>((ref) {
-  return StreakService();
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return StreakService(prefs);
 });
 
 final streakDataProvider = Provider<StreakData>((ref) {

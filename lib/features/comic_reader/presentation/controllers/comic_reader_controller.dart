@@ -103,22 +103,28 @@ class ComicReaderController extends Notifier<ComicReaderState> {
     }
   }
 
+  /// Explicitly halts any ongoing speech or auto-play sequence immediately
+  Future<void> stopNarration() async {
+    await _ttsService.stop();
+    state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+  }
+
   /// Toggles voice narration for the current panel
   Future<void> toggleAudioNarration() async {
     if (state.isSpeaking || state.isAutoPlaying) {
-      await _ttsService.stop();
-      state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+      await stopNarration();
       return;
     }
 
     final panel = state.currentPanel;
     if (panel == null) return;
 
-    final script = ComicTtsService.buildPanelSpeechScript(panel);
+    final lang = state.story?.language;
+    final script = ComicTtsService.buildPanelSpeechScript(panel, language: lang);
     if (script.isEmpty) return;
 
     state = state.copyWith(isSpeaking: true);
-    final success = await _ttsService.speak(script);
+    final success = await _ttsService.speak(script, language: lang);
     if (!success) {
       state = state.copyWith(isSpeaking: false);
     }
@@ -127,8 +133,7 @@ class ComicReaderController extends Notifier<ComicReaderState> {
   /// Hands-free Auto-Play: Reads entire comic from current panel to end, auto-advancing panels
   Future<void> toggleAutoPlayNarration() async {
     if (state.isAutoPlaying) {
-      await _ttsService.stop();
-      state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+      await stopNarration();
       return;
     }
 
@@ -143,14 +148,15 @@ class ComicReaderController extends Notifier<ComicReaderState> {
       return;
     }
 
-    final script = ComicTtsService.buildPanelSpeechScript(panel);
+    final lang = state.story?.language;
+    final script = ComicTtsService.buildPanelSpeechScript(panel, language: lang);
     if (script.isEmpty) {
       _handleSpeechCompleted();
       return;
     }
 
     state = state.copyWith(isSpeaking: true);
-    final success = await _ttsService.speak(script);
+    final success = await _ttsService.speak(script, language: lang);
     if (!success) {
       state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
     }
@@ -160,8 +166,12 @@ class ComicReaderController extends Notifier<ComicReaderState> {
   Future<void> speakSingleDialogue(ComicDialogue dialogue) async {
     await _ttsService.stop();
     state = state.copyWith(isSpeaking: true, isAutoPlaying: false);
-    final speechText = '${dialogue.speaker} says: ${dialogue.text}';
-    final success = await _ttsService.speak(speechText);
+    final isHindi = (state.story?.language.toLowerCase() == 'hindi') ||
+        RegExp(r'[\u0900-\u097F]').hasMatch(dialogue.text);
+    final speechText = isHindi
+        ? '${dialogue.speaker} कहते हैं: ${dialogue.text}'
+        : '${dialogue.speaker} says: ${dialogue.text}';
+    final success = await _ttsService.speak(speechText, language: state.story?.language);
     if (!success) {
       state = state.copyWith(isSpeaking: false);
     }

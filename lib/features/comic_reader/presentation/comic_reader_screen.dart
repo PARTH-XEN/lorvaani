@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/comic_colors.dart';
 import '../../../core/theme/comic_typography.dart';
+import '../../../core/widgets/audio_settings_sheet.dart';
 import '../../../core/widgets/comic_button.dart';
 import '../../../data/models/comic_story_model.dart';
 import '../../library/presentation/controllers/library_controller.dart';
@@ -132,6 +133,16 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
             onPressed: () => controller.toggleAutoPlayNarration(),
           ),
 
+          // Voice Persona & Volume Adjuster
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, color: ComicColors.skyCyan),
+            tooltip: 'Voice Persona & Volume Adjuster',
+            onPressed: () => AudioSettingsSheet.show(
+              context,
+              storyLanguage: widget.story.language,
+            ),
+          ),
+
           // Reading mode switch (Horizontal Page vs Vertical Scroll)
           IconButton(
             icon: Icon(
@@ -201,26 +212,66 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
       ),
       body: Column(
         children: [
-          // Auto-Play Active Notification Banner
-          if (readerState.isAutoPlaying)
+          // Active Audio Notification Banner with prominent STOP button
+          if (readerState.isAutoPlaying || readerState.isSpeaking)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: ComicColors.vibrantOrange.withValues(alpha: 0.18),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(
-                    Icons.record_voice_over_rounded,
-                    size: 16,
-                    color: ComicColors.vibrantOrange,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.record_voice_over_rounded,
+                        size: 16,
+                        color: ComicColors.vibrantOrange,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        readerState.isAutoPlaying
+                            ? 'Auto-Play: Panel ${readerState.currentPanelIndex + 1} of ${readerState.totalPanels}'
+                            : 'Speaking Panel ${readerState.currentPanelIndex + 1}...',
+                        style: ComicTypography.caption(
+                          color: ComicColors.vibrantOrange,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Hands-Free Narration: Panel ${readerState.currentPanelIndex + 1} of ${readerState.totalPanels}',
-                    style: ComicTypography.caption(
-                      color: ComicColors.vibrantOrange,
-                      fontWeight: FontWeight.bold,
+                  // Prominent STOP button
+                  GestureDetector(
+                    onTap: () => controller.stopNarration(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.black, width: 1.5),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black,
+                            offset: Offset(2, 2),
+                            blurRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.stop_rounded, size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            'STOP',
+                            style: ComicTypography.caption(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

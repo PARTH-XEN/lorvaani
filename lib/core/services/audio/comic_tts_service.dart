@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/models/comic_story_model.dart';
 
 enum TtsPlaybackStatus {
@@ -8,28 +9,84 @@ enum TtsPlaybackStatus {
   paused,
 }
 
+enum VoicePersona {
+  nova(
+    displayName: 'Nova (Expressive Scholar)',
+    pitch: 1.0,
+    rate: 0.5,
+    description: 'Natural, balanced scholar voice',
+  ),
+  sage(
+    displayName: 'Sage (Cosmic Mentor)',
+    pitch: 0.75,
+    rate: 0.45,
+    description: 'Deep, resonant mentor voice',
+  ),
+  spark(
+    displayName: 'Spark (Energetic Hero)',
+    pitch: 1.25,
+    rate: 0.55,
+    description: 'Bright, high-energy hero voice',
+  );
+
+  final String displayName;
+  final double pitch;
+  final double rate;
+  final String description;
+
+  const VoicePersona({
+    required this.displayName,
+    required this.pitch,
+    required this.rate,
+    required this.description,
+  });
+}
+
 /// Text-to-Speech audio narration service for comic panels and educational dialogues
+/// with volume adjustment, 3 distinct voice personas, and native Hindi/multilingual pronunciation.
 class ComicTtsService {
-  FlutterTts? _flutterTts;
+  static const _volumePrefKey = 'lorvani_tts_volume';
+  static const _personaPrefKey = 'lorvani_tts_persona';
+
+  FlutterTts? flutterTts;
   final bool isMockMode;
+  final SharedPreferences? prefs;
 
   TtsPlaybackStatus _status = TtsPlaybackStatus.stopped;
   String? _currentlySpeakingText;
   VoidCallback? onSpeechCompleted;
 
+  double _volume = 1.0;
+  VoicePersona _persona = VoicePersona.nova;
+  String _currentLanguageCode = 'en-US';
+
   ComicTtsService({
-    FlutterTts? flutterTts,
+    this.flutterTts,
     this.isMockMode = false,
+    this.prefs,
   }) {
-    _flutterTts = flutterTts;
+    _loadStoredPreferences();
     if (!isMockMode) {
       _initTts();
     }
   }
 
+  void _loadStoredPreferences() {
+    if (prefs != null) {
+      _volume = prefs!.getDouble(_volumePrefKey) ?? 1.0;
+      final storedPersonaName = prefs!.getString(_personaPrefKey);
+      if (storedPersonaName != null) {
+        _persona = VoicePersona.values.firstWhere(
+          (p) => p.name == storedPersonaName,
+          orElse: () => VoicePersona.nova,
+        );
+      }
+    }
+  }
+
   void _initTts() {
     try {
-      _flutterTts ??= FlutterTts();
+      flutterTts ??= FlutterTts();
       _initialize();
     } catch (e) {
       debugPrint('ComicTtsService initialize error (headless/unsupported): $e');
@@ -37,7 +94,7 @@ class ComicTtsService {
   }
 
   void _initialize() {
-    final tts = _flutterTts;
+    final tts = flutterTts;
     if (tts == null) return;
 
     try {
@@ -60,6 +117,9 @@ class ComicTtsService {
         _status = TtsPlaybackStatus.stopped;
         _currentlySpeakingText = null;
       });
+
+      // Apply initial volume & voice persona
+      _applyVoiceParams();
     } catch (e) {
       debugPrint('ComicTtsService initialize error (headless/unsupported): $e');
     }
@@ -68,10 +128,76 @@ class ComicTtsService {
   TtsPlaybackStatus get status => _status;
   bool get isSpeaking => _status == TtsPlaybackStatus.speaking;
   String? get currentlySpeakingText => _currentlySpeakingText;
+  double get volume => _volume;
+  VoicePersona get persona => _persona;
+  String get currentLanguageCode => _currentLanguageCode;
+
+  /// Sets audio playback volume (0.0 silent to 1.0 maximum)
+  Future<void> setVolume(double newVolume) async {
+    _volume = newVolume.clamp(0.0, 1.0);
+    prefs?.setDouble(_volumePrefKey, _volume);
+    if (!isMockMode && flutterTts != null) {
+      try {
+        await flutterTts!.setVolume(_volume);
+      } catch (e) {
+        debugPrint('Error setting TTS volume: $e');
+      }
+    }
+  }
+
+  /// Changes voice persona (Nova, Sage, Spark)
+  Future<void> setVoicePersona(VoicePersona newPersona) async {
+    _persona = newPersona;
+    prefs?.setString(_personaPrefKey, _persona.name);
+    await _applyVoiceParams();
+  }
+
+  Future<void> _applyVoiceParams() async {
+    if (isMockMode || flutterTts == null) return;
+    try {
+      await flutterTts!.setVolume(_volume);
+      await flutterTts!.setPitch(_persona.pitch);
+      await flutterTts!.setSpeechRate(_persona.rate);
+    } catch (e) {
+      debugPrint('Error applying TTS voice params: $e');
+    }
+  }
+
+  /// Resolves the optimal IETF BCP 47 language code for speech synthesis
+  static String resolveLanguageCode(String? storyLanguage, String sampleText) {
+    if (storyLanguage != null) {
+      final normalized = storyLanguage.trim().toLowerCase();
+      if (normalized == 'hindi' || normalized == 'hi') return 'hi-IN';
+      if (normalized == 'spanish' || normalized == 'es') return 'es-ES';
+      if (normalized == 'french' || normalized == 'fr') return 'fr-FR';
+      if (normalized == 'german' || normalized == 'de') return 'de-DE';
+    }
+
+    // Auto-detect Devanagari Unicode script for Hindi
+    final hasDevanagari = RegExp(r'[\u0900-\u097F]').hasMatch(sampleText);
+    if (hasDevanagari) {
+      return 'hi-IN';
+    }
+
+    return 'en-US';
+  }
+
+  /// Sets TTS language code before speaking
+  Future<void> setLanguage(String languageCode) async {
+    _currentLanguageCode = languageCode;
+    if (isMockMode || flutterTts == null) return;
+    try {
+      await flutterTts!.setLanguage(languageCode);
+    } catch (e) {
+      debugPrint('Error setting TTS language to $languageCode: $e');
+    }
+  }
 
   /// Synthesizes panel narration and dialogues into a natural voice script
-  static String buildPanelSpeechScript(ComicPanelModel panel) {
+  static String buildPanelSpeechScript(ComicPanelModel panel, {String? language}) {
     final buffer = StringBuffer();
+    final isHindi = (language?.toLowerCase() == 'hindi') ||
+        RegExp(r'[\u0900-\u097F]').hasMatch(panel.narration);
 
     if (panel.narration.trim().isNotEmpty) {
       buffer.write(panel.narration.trim());
@@ -80,66 +206,78 @@ class ComicTtsService {
 
     for (final d in panel.dialogue) {
       if (d.text.trim().isNotEmpty) {
-        buffer.write('${d.speaker} says: ${d.text.trim()}. ');
+        if (isHindi) {
+          buffer.write('${d.speaker} कहते हैं: ${d.text.trim()}. ');
+        } else {
+          buffer.write('${d.speaker} says: ${d.text.trim()}. ');
+        }
       }
     }
 
     return buffer.toString().trim();
   }
 
-  /// Speaks the provided text
-  Future<bool> speak(String text) async {
+  /// Speaks the provided text in the target language
+  Future<bool> speak(String text, {String? language}) async {
     if (text.trim().isEmpty) return false;
 
     _currentlySpeakingText = text;
     _status = TtsPlaybackStatus.speaking;
+
+    final targetLang = resolveLanguageCode(language, text);
+    if (targetLang != _currentLanguageCode) {
+      await setLanguage(targetLang);
+    }
 
     if (isMockMode) {
       return true;
     }
 
     try {
-      final tts = _flutterTts;
-      if (tts == null) return false;
-
-      await tts.setLanguage('en-US');
-      await tts.setSpeechRate(0.5);
-      await tts.setVolume(1.0);
-      await tts.setPitch(1.0);
-
-      final result = await tts.speak(text);
+      await _applyVoiceParams();
+      final result = await flutterTts?.speak(text);
       return result == 1;
     } catch (e) {
-      debugPrint('ComicTtsService speak error: $e');
+      debugPrint('TTS speak error: $e');
       _status = TtsPlaybackStatus.stopped;
       return false;
     }
   }
 
-  /// Stops current speech output
-  Future<void> stop() async {
+  /// Immediately cancels and stops any active or pending speech
+  Future<bool> stop() async {
     _status = TtsPlaybackStatus.stopped;
     _currentlySpeakingText = null;
 
-    if (isMockMode) return;
+    if (isMockMode) {
+      return true;
+    }
 
     try {
-      await _flutterTts?.stop();
+      final result = await flutterTts?.stop();
+      return result == 1;
     } catch (e) {
-      debugPrint('ComicTtsService stop error: $e');
+      debugPrint('TTS stop error: $e');
+      return false;
     }
   }
 
-  /// Pauses current speech output
-  Future<void> pause() async {
-    _status = TtsPlaybackStatus.paused;
-
-    if (isMockMode) return;
+  Future<bool> pause() async {
+    if (isMockMode) {
+      _status = TtsPlaybackStatus.paused;
+      return true;
+    }
 
     try {
-      await _flutterTts?.pause();
+      final result = await flutterTts?.pause();
+      if (result == 1) {
+        _status = TtsPlaybackStatus.paused;
+        return true;
+      }
+      return false;
     } catch (e) {
-      debugPrint('ComicTtsService pause error: $e');
+      debugPrint('TTS pause error: $e');
+      return false;
     }
   }
 }

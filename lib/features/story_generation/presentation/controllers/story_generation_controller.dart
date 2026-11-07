@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/ai/ai_config_service.dart';
 import '../../../../core/services/ai/ai_provider_types.dart';
+import '../../../../core/services/auth/auth_service.dart';
 import '../../../../core/services/ai/mock/mock_image_provider.dart';
 import '../../../../core/services/ai/mock/mock_text_provider.dart';
 import '../../../../core/services/ai/orchestrator/ai_orchestrator.dart';
@@ -172,6 +173,9 @@ class StoryGenerationController extends Notifier<StoryGenerationState> {
           progressMessage: 'Comic script ready!',
           generatedStory: storyWithArt,
         );
+
+        // Record generation in trial/account tracker
+        await ref.read(authServiceProvider).recordStoryGenerated();
 
         return true;
       } on StorySchemaValidationException catch (e) {

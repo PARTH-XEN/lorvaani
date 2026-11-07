@@ -7,6 +7,7 @@ import '../../../core/theme/comic_typography.dart';
 import '../../../core/widgets/badge_chip.dart';
 import '../../../core/widgets/comic_button.dart';
 import '../../../core/widgets/comic_panel.dart';
+import '../../../core/widgets/comic_trial_gate_dialog.dart';
 import '../../story_input/presentation/controllers/story_input_controller.dart';
 import 'controllers/story_generation_controller.dart';
 
@@ -37,7 +38,11 @@ class _StoryCustomizationScreenState
     _language = currentOpts.language;
   }
 
-  void _onGeneratePressed() {
+  Future<void> _onGeneratePressed() async {
+    final allowed =
+        await ComicTrialGateDialog.checkAndEnforceTrial(context, ref);
+    if (!allowed || !mounted) return;
+
     final opts = StoryGenerationOptions(
       learningLevel: _level,
       visualStyle: _style,

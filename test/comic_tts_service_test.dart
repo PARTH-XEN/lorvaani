@@ -55,6 +55,42 @@ void main() {
 
       expect(ttsService.status, equals(TtsPlaybackStatus.paused));
     });
+
+    test('updates volume and persona correctly', () async {
+      expect(ttsService.volume, equals(1.0));
+      expect(ttsService.persona, equals(VoicePersona.nova));
+
+      await ttsService.setVolume(0.4);
+      expect(ttsService.volume, closeTo(0.4, 0.01));
+
+      await ttsService.setVoicePersona(VoicePersona.sage);
+      expect(ttsService.persona, equals(VoicePersona.sage));
+
+      await ttsService.setVoicePersona(VoicePersona.spark);
+      expect(ttsService.persona, equals(VoicePersona.spark));
+    });
+
+    test('resolves Hindi language code and formats Hindi dialogue properly', () {
+      final langCode = ComicTtsService.resolveLanguageCode('Hindi', 'प्रकाश संश्लेषण');
+      expect(langCode, equals('hi-IN'));
+
+      final script = ComicTtsService.buildPanelSpeechScript(
+        const ComicPanelModel(
+          panelNumber: 1,
+          panelTitle: 'Title',
+          panelDescription: 'Desc',
+          narration: 'पौधे सूर्य से ऊर्जा लेते हैं',
+          dialogue: [
+            ComicDialogue(speaker: 'अध्यापक', text: 'यह पर्णहरित है'),
+          ],
+          keyVisualCue: 'Sunlight',
+        ),
+        language: 'Hindi',
+      );
+
+      expect(script, contains('पौधे सूर्य से ऊर्जा लेते हैं.'));
+      expect(script, contains('अध्यापक कहते हैं: यह पर्णहरित है.'));
+    });
   });
 }
 

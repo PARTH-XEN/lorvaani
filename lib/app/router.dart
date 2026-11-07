@@ -4,7 +4,7 @@ import '../features/explore/presentation/explore_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
-import '../features/profile/presentation/profile_placeholder_screen.dart';
+import '../features/profile/presentation/profile_screen.dart';
 import '../features/shared/presentation/main_shell_screen.dart';
 import '../features/splash/presentation/splash_screen.dart';
 import '../features/story_input/presentation/story_input_screen.dart';
@@ -107,7 +107,7 @@ final GoRouter appRouter = GoRouter(
           path: '/profile',
           name: 'profile',
           pageBuilder: (context, state) => const NoTransitionPage(
-            child: ProfilePlaceholderScreen(),
+            child: ProfileScreen(),
           ),
         ),
       ],

@@ -26,8 +26,8 @@ final aiOrchestratorProvider = Provider<AiOrchestrator>((ref) {
 
   return AiOrchestrator(
     textProviders: [
-      GeminiTextProvider(apiKey: geminiKey),
       GroqTextProvider(apiKey: groqKey),
+      GeminiTextProvider(apiKey: geminiKey),
       const MockTextProvider(),
     ],
     imageProviders: [

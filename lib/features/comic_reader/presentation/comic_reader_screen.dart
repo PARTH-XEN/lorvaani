@@ -73,6 +73,20 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
     final readerState = ref.watch(comicReaderControllerProvider);
     final controller = ref.read(comicReaderControllerProvider.notifier);
 
+    // Sync PageController when auto-play advances panel
+    ref.listen<ComicReaderState>(comicReaderControllerProvider, (prev, next) {
+      if (_pageController.hasClients &&
+          next.currentPanelIndex != prev?.currentPanelIndex) {
+        if (_pageController.page?.round() != next.currentPanelIndex) {
+          _pageController.animateToPage(
+            next.currentPanelIndex,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    });
+
     return Scaffold(
       backgroundColor: ComicColors.deepCharcoal,
       appBar: AppBar(
@@ -102,6 +116,22 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
           ],
         ),
         actions: [
+          // Hands-free Auto-Play Full Story Audio
+          IconButton(
+            icon: Icon(
+              readerState.isAutoPlaying
+                  ? Icons.pause_circle_filled_rounded
+                  : Icons.play_circle_filled_rounded,
+              color: readerState.isAutoPlaying
+                  ? ComicColors.vibrantOrange
+                  : ComicColors.skyCyan,
+            ),
+            tooltip: readerState.isAutoPlaying
+                ? 'Pause Hands-Free Story Audio'
+                : 'Auto-Play Full Story Audio (Hands-Free)',
+            onPressed: () => controller.toggleAutoPlayNarration(),
+          ),
+
           // Reading mode switch (Horizontal Page vs Vertical Scroll)
           IconButton(
             icon: Icon(
@@ -171,6 +201,32 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
       ),
       body: Column(
         children: [
+          // Auto-Play Active Notification Banner
+          if (readerState.isAutoPlaying)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              color: ComicColors.vibrantOrange.withValues(alpha: 0.18),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.record_voice_over_rounded,
+                    size: 16,
+                    color: ComicColors.vibrantOrange,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Hands-Free Narration: Panel ${readerState.currentPanelIndex + 1} of ${readerState.totalPanels}',
+                    style: ComicTypography.caption(
+                      color: ComicColors.vibrantOrange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // 1. Comic Reader Content
           Expanded(
             child: readerState.readingMode == ReadingMode.horizontalPage

@@ -52,21 +52,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const DimensionFlipLogo(
-                      variant: DimensionFlipVariant.primary,
-                      size: 34,
+                    const Flexible(
+                      child: DimensionFlipLogo(
+                        variant: DimensionFlipVariant.primary,
+                        size: 32,
+                      ),
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         // AI Model / Key Configuration Button
                         GestureDetector(
                           onTap: () => AiSettingsDialog.show(context),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
+                                horizontal: 8, vertical: 5),
                             decoration: BoxDecoration(
                               color: ComicColors.cardBackground,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: aiConfig.hasLiveKeyConfigured
                                     ? ComicColors.skyCyan
@@ -84,15 +87,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   color: aiConfig.hasLiveKeyConfigured
                                       ? ComicColors.skyCyan
                                       : ComicColors.electricYellow,
-                                  size: 16,
+                                  size: 14,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 Text(
                                   aiConfig.hasLiveKeyConfigured
-                                      ? 'Live AI'
+                                      ? 'Groq AI'
                                       : 'AI Key',
                                   style: ComicTypography.caption(
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                     color: ComicColors.softWhite,
                                   ),
@@ -103,29 +106,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         const SizedBox(width: 8),
 
-                        // Notification Icon
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: ComicColors.cardBackground,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: ComicColors.comicBorder, width: 1.8),
-                          ),
-                          child: const Icon(
-                            Icons.notifications_none_rounded,
-                            color: ComicColors.textPrimary,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-
                         // Profile Avatar
                         GestureDetector(
                           onTap: () => context.go('/profile'),
                           child: Container(
-                            width: 38,
-                            height: 38,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               gradient: ComicColors.dimensionGradient,
@@ -135,7 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             child: const Center(
                               child: Text(
                                 '⚡',
-                                style: TextStyle(fontSize: 18),
+                                style: TextStyle(fontSize: 16),
                               ),
                             ),
                           ),

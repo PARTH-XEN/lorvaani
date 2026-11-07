@@ -8,11 +8,12 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('defaults to no live keys and offline story engine', () async {
+    test('defaults to configured Groq key out-of-the-box', () async {
       final service = await AiConfigService.initialize();
 
-      expect(service.hasLiveKeyConfigured, isFalse);
-      expect(service.activeProviderName, 'Offline Comic Story Engine');
+      expect(service.hasLiveKeyConfigured, isTrue);
+      expect(service.activeProviderName, contains('Groq'));
+      expect(service.getGroqApiKey(), AiConfigService.defaultGroqApiKey);
       expect(service.getGeminiApiKey(), isNull);
     });
 
@@ -22,12 +23,10 @@ void main() {
 
       expect(service.getGeminiApiKey(), 'AIzaSyTestKey123');
       expect(service.hasLiveKeyConfigured, isTrue);
-      expect(service.activeProviderName, contains('Gemini'));
 
-      // Clearing key restores offline engine
+      // Clearing key restores null
       await service.setGeminiApiKey('');
       expect(service.getGeminiApiKey(), isNull);
-      expect(service.hasLiveKeyConfigured, isFalse);
     });
   });
 }

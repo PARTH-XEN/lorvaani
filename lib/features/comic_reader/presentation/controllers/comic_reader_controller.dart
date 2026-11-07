@@ -29,6 +29,22 @@ class ComicReaderController extends Notifier<ComicReaderState> {
   }
 
   void _handleSpeechCompleted() {
+    if (state.isAutoPlaying) {
+      if (!state.isLastPanel) {
+        // Automatically advance to the next panel and continue speaking!
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (state.isAutoPlaying) {
+            nextPanel();
+            _speakCurrentPanelInAutoPlay();
+          }
+        });
+        return;
+      } else {
+        // Reached end of comic!
+        state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+        return;
+      }
+    }
     state = state.copyWith(isSpeaking: false);
   }
 
@@ -40,6 +56,7 @@ class ComicReaderController extends Notifier<ComicReaderState> {
       currentPanelIndex: 0,
       readingMode: state.readingMode,
       isSpeaking: false,
+      isAutoPlaying: false,
     );
   }
 
@@ -65,6 +82,7 @@ class ComicReaderController extends Notifier<ComicReaderState> {
       state = state.copyWith(
         currentPanelIndex: clamped,
         isSpeaking: false,
+        isAutoPlaying: false,
       );
     }
   }
@@ -72,22 +90,24 @@ class ComicReaderController extends Notifier<ComicReaderState> {
   /// Advances to next panel
   void nextPanel() {
     if (!state.isLastPanel) {
-      goToPanel(state.currentPanelIndex + 1);
+      final nextIdx = state.currentPanelIndex + 1;
+      state = state.copyWith(currentPanelIndex: nextIdx);
     }
   }
 
   /// Moves back to previous panel
   void previousPanel() {
     if (!state.isFirstPanel) {
-      goToPanel(state.currentPanelIndex - 1);
+      final prevIdx = state.currentPanelIndex - 1;
+      state = state.copyWith(currentPanelIndex: prevIdx);
     }
   }
 
   /// Toggles voice narration for the current panel
   Future<void> toggleAudioNarration() async {
-    if (state.isSpeaking) {
+    if (state.isSpeaking || state.isAutoPlaying) {
       await _ttsService.stop();
-      state = state.copyWith(isSpeaking: false);
+      state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
       return;
     }
 
@@ -104,10 +124,42 @@ class ComicReaderController extends Notifier<ComicReaderState> {
     }
   }
 
+  /// Hands-free Auto-Play: Reads entire comic from current panel to end, auto-advancing panels
+  Future<void> toggleAutoPlayNarration() async {
+    if (state.isAutoPlaying) {
+      await _ttsService.stop();
+      state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+      return;
+    }
+
+    state = state.copyWith(isAutoPlaying: true);
+    await _speakCurrentPanelInAutoPlay();
+  }
+
+  Future<void> _speakCurrentPanelInAutoPlay() async {
+    final panel = state.currentPanel;
+    if (panel == null) {
+      state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+      return;
+    }
+
+    final script = ComicTtsService.buildPanelSpeechScript(panel);
+    if (script.isEmpty) {
+      _handleSpeechCompleted();
+      return;
+    }
+
+    state = state.copyWith(isSpeaking: true);
+    final success = await _ttsService.speak(script);
+    if (!success) {
+      state = state.copyWith(isSpeaking: false, isAutoPlaying: false);
+    }
+  }
+
   /// Speaks an individual dialogue bubble when tapped by the user
   Future<void> speakSingleDialogue(ComicDialogue dialogue) async {
     await _ttsService.stop();
-    state = state.copyWith(isSpeaking: true);
+    state = state.copyWith(isSpeaking: true, isAutoPlaying: false);
     final speechText = '${dialogue.speaker} says: ${dialogue.text}';
     final success = await _ttsService.speak(speechText);
     if (!success) {
@@ -130,4 +182,3 @@ class ComicReaderController extends Notifier<ComicReaderState> {
     state = state.copyWith(isConceptSheetOpen: open);
   }
 }
-

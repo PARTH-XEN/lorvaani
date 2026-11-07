@@ -6,6 +6,10 @@ class AiConfigService {
   static const _geminiKeyPref = 'lorvani_ai_gemini_key';
   static const _groqKeyPref = 'lorvani_ai_groq_key';
 
+  /// Pre-configured high-speed Groq API key available out of the box
+  static const defaultGroqApiKey =
+      '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';
+
   final SharedPreferences? _prefs;
 
   AiConfigService([this._prefs]);
@@ -37,7 +41,7 @@ class AiConfigService {
     return _prefs.setString(_geminiKeyPref, key.trim());
   }
 
-  /// Get stored Groq API Key, falling back to compile-time environment variable.
+  /// Get stored Groq API Key, falling back to compile-time environment variable or default key.
   String? getGroqApiKey() {
     final stored = _prefs?.getString(_groqKeyPref);
     if (stored != null && stored.trim().isNotEmpty) {
@@ -47,7 +51,7 @@ class AiConfigService {
     if (envKey.isNotEmpty) {
       return envKey;
     }
-    return null;
+    return defaultGroqApiKey;
   }
 
   /// Save Groq API Key.
@@ -61,12 +65,12 @@ class AiConfigService {
 
   /// Check whether at least one live LLM provider has an active API key configured.
   bool get hasLiveKeyConfigured =>
-      getGeminiApiKey() != null || getGroqApiKey() != null;
+      getGroqApiKey() != null || getGeminiApiKey() != null;
 
   /// Provider name currently in use for display.
   String get activeProviderName {
+    if (getGroqApiKey() != null) return 'Groq LPU (GPT-OSS-120B)';
     if (getGeminiApiKey() != null) return 'Google Gemini 1.5 Flash';
-    if (getGroqApiKey() != null) return 'Groq LPU (Llama 3.3)';
     return 'Offline Comic Story Engine';
   }
 }

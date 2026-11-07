@@ -130,6 +130,21 @@ void main() {
       expect(container.read(comicReaderControllerProvider).isSpeaking, isFalse);
     });
 
+    test('toggles hands-free auto-play narration', () async {
+      final controller = container.read(comicReaderControllerProvider.notifier);
+      controller.initialize(sampleStory);
+
+      expect(container.read(comicReaderControllerProvider).isAutoPlaying, isFalse);
+
+      await controller.toggleAutoPlayNarration();
+      expect(container.read(comicReaderControllerProvider).isAutoPlaying, isTrue);
+      expect(container.read(comicReaderControllerProvider).isSpeaking, isTrue);
+
+      await controller.toggleAutoPlayNarration();
+      expect(container.read(comicReaderControllerProvider).isAutoPlaying, isFalse);
+      expect(container.read(comicReaderControllerProvider).isSpeaking, isFalse);
+    });
+
     test('expands and closes modal panel view', () {
       final controller = container.read(comicReaderControllerProvider.notifier);
       controller.initialize(sampleStory);

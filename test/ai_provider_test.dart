@@ -62,6 +62,26 @@ void main() {
       expect(narrations.length, panels.length);
     });
 
+    test('MockTextProvider generates localized Hindi story for anime genre', () async {
+      const provider = MockTextProvider(simulatedDelayMs: 0);
+      const options = StoryGenerationOptions(
+        learningLevel: LearningLevel.beginner,
+        visualStyle: ComicVisualStyle.animeInspired,
+        panelCount: 4,
+        language: 'Hindi',
+      );
+
+      final response = await provider.generateStory(
+        prompt: 'प्रकाश संश्लेषण',
+        options: options,
+      );
+
+      expect(response.json['storyTitle'], contains('प्रकाश संश्लेषण'));
+      final panels = response.json['panels'] as List;
+      expect(panels.length, 4);
+      expect(panels[0]['panelTitle'], contains('दृश्य 1'));
+    });
+
     test('MockTextProvider generates conceptual analogies', () async {
       const provider = MockTextProvider(simulatedDelayMs: 10);
       final response = await provider.generateAnalogy(

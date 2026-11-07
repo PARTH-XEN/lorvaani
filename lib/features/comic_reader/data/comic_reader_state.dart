@@ -11,6 +11,7 @@ class ComicReaderState {
   final int currentPanelIndex;
   final ReadingMode readingMode;
   final bool isSpeaking;
+  final bool isAutoPlaying;
   final ComicPanelModel? expandedPanel;
   final bool isConceptSheetOpen;
 
@@ -19,6 +20,7 @@ class ComicReaderState {
     this.currentPanelIndex = 0,
     this.readingMode = ReadingMode.horizontalPage,
     this.isSpeaking = false,
+    this.isAutoPlaying = false,
     this.expandedPanel,
     this.isConceptSheetOpen = false,
   });
@@ -43,6 +45,7 @@ class ComicReaderState {
     int? currentPanelIndex,
     ReadingMode? readingMode,
     bool? isSpeaking,
+    bool? isAutoPlaying,
     ComicPanelModel? expandedPanel,
     bool clearExpandedPanel = false,
     bool? isConceptSheetOpen,
@@ -52,9 +55,9 @@ class ComicReaderState {
       currentPanelIndex: currentPanelIndex ?? this.currentPanelIndex,
       readingMode: readingMode ?? this.readingMode,
       isSpeaking: isSpeaking ?? this.isSpeaking,
+      isAutoPlaying: isAutoPlaying ?? this.isAutoPlaying,
       expandedPanel: clearExpandedPanel ? null : (expandedPanel ?? this.expandedPanel),
       isConceptSheetOpen: isConceptSheetOpen ?? this.isConceptSheetOpen,
     );
   }
 }
-
